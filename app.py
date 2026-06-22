@@ -9,27 +9,49 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .main {
-        background-color: #f0f7ff;
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #f093fb 50%, #f5576c 100%);
+    }
+    h1, h2, h3, p, label {
+        color: white !important;
     }
     .stButton>button {
         background-color: #ff6b35;
         color: white;
         border-radius: 20px;
         padding: 10px 25px;
-        font-size: 16px;
+        font-size: 18px;
+        font-weight: bold;
         border: none;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
     }
     .stButton>button:hover {
-        background-color: #e55a25;
+        background-color: #ffcc00;
+        color: black;
     }
     .stTextInput>div>input {
-        border-radius: 10px;
-        border: 2px solid #ff6b35;
+        border-radius: 15px;
+        border: 2px solid white;
+        background-color: rgba(255,255,255,0.9);
+        font-size: 16px;
     }
     .stSelectbox>div>div {
-        border-radius: 10px;
-        border: 2px solid #ff6b35;
+        border-radius: 15px;
+        background-color: rgba(255,255,255,0.9);
+    }
+    .stNumberInput>div>div>input {
+        border-radius: 15px;
+        background-color: rgba(255,255,255,0.9);
+    }
+    .stSuccess {
+        background-color: rgba(255,255,255,0.2) !important;
+        border-radius: 15px;
+    }
+    .stSpinner {
+        color: white !important;
+    }
+    div[data-testid="stMarkdownContainer"] p {
+        color: white !important;
     }
     </style>
 """, unsafe_allow_html=True)
