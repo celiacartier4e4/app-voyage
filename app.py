@@ -11,7 +11,7 @@ budget = st.selectbox("Ton budget ?", ["Petit budget", "Moyen", "Confortable"])
 if st.button("Organise mon voyage !"):
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": f"Organise moi un voyage de {jours} jours à {destination} avec un budget {budget}. Fais un itinéraire jour par jour en français."}]
     )
     st.write(response.choices[0].message.content)
