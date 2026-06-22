@@ -15,10 +15,11 @@ if st.button("Organise mon voyage !"):
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
     question = f"Organise moi un voyage de {jours} jours à {destination} avec un budget {budget}. Fais un itinéraire jour par jour en français."
     st.session_state.historique = [{"role": "user", "content": question}]
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=st.session_state.historique
-    )
+    with st.spinner("Je prépare ton voyage... 🌍"):
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=st.session_state.historique
+        )
     reponse = response.choices[0].message.content
     st.session_state.historique.append({"role": "assistant", "content": reponse})
     st.write(reponse)
@@ -29,10 +30,5 @@ if st.session_state.get("historique"):
     if st.button("Poser ma question"):
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         st.session_state.historique.append({"role": "user", "content": question_suivi})
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=st.session_state.historique
-        )
-        reponse = response.choices[0].message.content
-        st.session_state.historique.append({"role": "assistant", "content": reponse})
-        st.write(reponse)
+        with st.spinner("Je réfléchis à ta question... 💭"):
+            response
