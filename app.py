@@ -63,7 +63,7 @@ if bouton:
             info_enfants = f" et {int(nb_enfants)} enfant(s) ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
 
         with st.spinner("Je prepare ton voyage... 🌍"):
-            question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
+            question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe. Precise toujours les prix en euros ET dans la monnaie locale du pays."
             st.session_state.historique = [{"role": "user", "content": question}]
             response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=st.session_state.historique)
             reponse = response.choices[0].message.content
@@ -73,13 +73,25 @@ if bouton:
         st.write(reponse)
 
         st.markdown("---")
+
+        try:
+            geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={destination}&count=1&language=fr").json()
+            lat = geo["results"][0]["latitude"]
+            lon = geo["results"][0]["longitude"]
+            pays = geo["results"][0].get("country", "")
+            st.markdown(f"<p style='color:white!important;font-weight:bold;font-size:18px'>📍 Destination détectée : {destination}, {pays}</p>", unsafe_allow_html=True)
+        except:
+            lat, lon, pays = None, None, ""
+
+        with st.spinner("Je cherche la monnaie locale... 💱"):
+            q_monnaie = f"Quelle est la monnaie officielle utilisée à {destination} ? Donne moi aussi le taux de conversion approximatif par rapport à l'euro. Reponds en 2-3 lignes en francais."
+            r_monnaie = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_monnaie}])
+            st.info("💱 " + r_monnaie.choices[0].message.content)
+
         tab1, tab2, tab3, tab4 = st.tabs(["🌤️ Météo", "🗺️ Carte", "🧳 Bagages", "🗣️ Phrases utiles"])
 
         with tab1:
             try:
-                geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={destination}&count=1&language=fr").json()
-                lat = geo["results"][0]["latitude"]
-                lon = geo["results"][0]["longitude"]
                 meteo = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&temperature_unit=celsius").json()
                 temp = meteo["current_weather"]["temperature"]
                 vent = meteo["current_weather"]["windspeed"]
