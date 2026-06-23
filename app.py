@@ -9,6 +9,9 @@ st.markdown("# ✈️ Mon Organisateur de Voyage")
 st.markdown("### 🌍 Dis moi où tu veux aller, et je t'organise ton voyage !")
 st.markdown("---")
 
+if "historique" not in st.session_state:
+    st.session_state.historique = []
+
 st.markdown("<div class='boite'>", unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -17,12 +20,11 @@ with col2:
     jours = st.number_input("📅 Nombre de jours", min_value=1, value=5)
 with col3:
     budget = st.selectbox("💰 Ton budget", ["Petit budget", "Moyen", "Confortable"])
+
+bouton = st.button("✈️ Organise mon voyage !")
 st.markdown("</div>", unsafe_allow_html=True)
 
-if "historique" not in st.session_state:
-    st.session_state.historique = []
-
-if st.button("✈️ Organise mon voyage !"):
+if bouton:
     if destination:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         question = f"Organise moi un voyage de {jours} jours a {destination} avec un budget {budget}. Fais un itineraire jour par jour en francais."
@@ -44,8 +46,9 @@ if st.session_state.get("historique"):
     st.markdown("<div class='boite'>", unsafe_allow_html=True)
     st.markdown("### 💬 Tu as une question sur ce voyage ?")
     question_suivi = st.text_input("Pose ta question ici...")
+    bouton2 = st.button("📨 Poser ma question")
     st.markdown("</div>", unsafe_allow_html=True)
-    if st.button("📨 Poser ma question"):
+    if bouton2:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         st.session_state.historique.append({"role": "user", "content": question_suivi})
         with st.spinner("Je reflechis a ta question... 💭"):
