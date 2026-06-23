@@ -29,11 +29,21 @@ with col_c:
     if st.button("🌴 Bali"):
         st.session_state.destination_choisie = "Bali"
 
+type_voyage = st.selectbox("🚗 Type de voyage", ["Une seule ville", "Road trip (plusieurs villes)"])
+
 col1, col2 = st.columns(2)
 with col1:
-    destination = st.text_input("📍 Ta destination", value=st.session_state.destination_choisie)
+    if type_voyage == "Une seule ville":
+        destination = st.text_input("📍 Ta destination", value=st.session_state.destination_choisie)
+    else:
+        destination = st.text_input("📍 Pays ou région du road trip", value=st.session_state.destination_choisie)
 with col2:
     jours = st.number_input("📅 Nombre de jours", min_value=1, value=5)
+
+if type_voyage == "Road trip (plusieurs villes)":
+    nb_villes = st.number_input("🏙️ Nombre de villes à visiter", min_value=2, max_value=10, value=3)
+else:
+    nb_villes = 1
 
 col3, col4 = st.columns(2)
 with col3:
@@ -59,13 +69,19 @@ with col_btn2:
     bouton_aventure = st.button("🎒 Mode aventure !")
 st.markdown("</div>", unsafe_allow_html=True)
 
-def generer_voyage(destination, jours, nb_adultes, info_enfants, budget, mode_aventure=False):
+def generer_voyage(destination, jours, nb_adultes, nb_enfants, ages_enfants, info_enfants, budget, type_voyage, nb_villes, mode_aventure=False):
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+    total_personnes = int(nb_adultes) + int(nb_enfants)
+
+    if type_voyage == "Road trip (plusieurs villes)":
+        intro = f"Organise moi un road trip de {jours} jours dans {destination} en visitant {int(nb_villes)} villes differentes"
+    else:
+        intro = f"Organise moi un voyage de {jours} jours a {destination}"
 
     if mode_aventure:
-        question = f"Organise moi un itineraire SURPRENANT et ORIGINAL de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Propose des activites insolites et hors des sentiers battus. Precise les prix en euros et en monnaie locale. Reponds en francais."
+        question = f"{intro} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Propose des activites SURPRENANTES et INSOLITES hors des sentiers battus. A la fin, donne le cout total estime EN EUROS PAR PERSONNE et POUR TOUT LE GROUPE de {total_personnes} personne(s). Reponds en francais."
     else:
-        question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe. Precise les prix en euros et en monnaie locale."
+        question = f"{intro} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour adapte au groupe. A la fin, donne le cout total estime EN EUROS PAR PERSONNE et POUR TOUT LE GROUPE de {total_personnes} personne(s). Reponds en francais."
 
     st.session_state.historique = [{"role": "user", "content": question}]
     response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=st.session_state.historique)
@@ -91,7 +107,7 @@ def generer_voyage(destination, jours, nb_adultes, info_enfants, budget, mode_av
         st.info("💱 " + r_monnaie.choices[0].message.content)
 
     with st.spinner("Verification de la meilleure periode... 📅"):
-        q_periode = f"Est-ce que c'est une bonne periode pour visiter {destination} en ce moment ? Quelle est la meilleure saison pour y aller ? Reponds en francais en 3-4 lignes."
+        q_periode = f"Est-ce que c'est une bonne periode pour visiter {destination} en ce moment ? Quelle est la meilleure saison ? Reponds en francais en 3-4 lignes."
         r_periode = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_periode}])
         st.info("📅 " + r_periode.choices[0].message.content)
 
@@ -115,7 +131,7 @@ def generer_voyage(destination, jours, nb_adultes, info_enfants, budget, mode_av
 
     with tab3:
         with st.spinner("Je prépare ta liste de bagages... 🧳"):
-            q_bagages = f"Fais moi une liste de choses a emporter pour un voyage de {jours} jours a {destination} avec un budget {budget}{info_enfants}. Sois pratique et adapte a la destination. Reponds en francais."
+            q_bagages = f"Fais moi une liste de choses a emporter pour un voyage de {jours} jours a {destination} avec un budget {budget}{info_enfants}. Reponds en francais."
             r_bagages = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_bagages}])
             st.write(r_bagages.choices[0].message.content)
 
@@ -127,7 +143,7 @@ def generer_voyage(destination, jours, nb_adultes, info_enfants, budget, mode_av
 
     with tab5:
         with st.spinner("Verification de la securite... ⚠️"):
-            q_securite = f"Donne moi les conseils de securite importants pour un voyage a {destination} : vaccins recommandes, zones a eviter, numeros d'urgence, dangers eventuels. Reponds en francais."
+            q_securite = f"Donne moi les conseils de securite pour un voyage a {destination} : vaccins recommandes, zones a eviter, numeros d'urgence, dangers eventuels. Reponds en francais."
             r_securite = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_securite}])
             st.write(r_securite.choices[0].message.content)
 
@@ -150,7 +166,7 @@ if bouton or bouton_aventure:
         if ages_enfants:
             info_enfants = f" et {int(nb_enfants)} enfant(s) ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
         with st.spinner("Je prepare ton voyage... 🌍"):
-            generer_voyage(destination, jours, nb_adultes, info_enfants, budget, mode_aventure=bouton_aventure)
+            generer_voyage(destination, jours, nb_adultes, nb_enfants, ages_enfants, info_enfants, budget, type_voyage, nb_villes, mode_aventure=bouton_aventure)
     else:
         st.warning("Entre une destination d'abord ! 📍")
 
