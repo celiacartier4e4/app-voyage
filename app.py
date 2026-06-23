@@ -24,16 +24,18 @@ col3, col4 = st.columns(2)
 with col3:
     budget = st.selectbox("💰 Ton budget", ["Petit budget", "Moyen", "Confortable"])
 with col4:
-    nb_personnes = st.number_input("👥 Nombre de personnes", min_value=1, value=1)
+    nb_adultes = st.number_input("🧑 Nombre d'adultes", min_value=0, value=1)
 
-type_voyageurs = st.selectbox("🧑 Type de voyageurs", ["Adultes uniquement", "Adultes et enfants", "Enfants uniquement"])
+nb_enfants = st.number_input("👶 Nombre d'enfants", min_value=0, value=0)
 
 ages_enfants = []
-if type_voyageurs in ["Adultes et enfants", "Enfants uniquement"]:
-    nb_enfants = st.number_input("👶 Nombre d'enfants", min_value=1, value=1)
+if nb_enfants > 0:
+    st.markdown("🎂 **Age des enfants**")
+    cols = st.columns(int(nb_enfants))
     for i in range(int(nb_enfants)):
-        age = st.number_input(f"🎂 Age de l'enfant {i+1}", min_value=1, max_value=16, value=5)
-        ages_enfants.append(age)
+        with cols[i]:
+            age = st.number_input(f"Enfant {i+1}", min_value=1, max_value=16, value=5)
+            ages_enfants.append(age)
 
 bouton = st.button("✈️ Organise mon voyage !")
 st.markdown("</div>", unsafe_allow_html=True)
@@ -44,9 +46,9 @@ if bouton:
 
         info_enfants = ""
         if ages_enfants:
-            info_enfants = f" avec des enfants ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
+            info_enfants = f" et {int(nb_enfants)} enfant(s) ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
 
-        question = f"Organise moi un voyage de {jours} jours a {destination} pour {nb_personnes} personnes ({type_voyageurs}{info_enfants}) avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
+        question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
         st.session_state.historique = [{"role": "user", "content": question}]
         with st.spinner("Je prepare ton voyage... 🌍"):
             response = client.chat.completions.create(
