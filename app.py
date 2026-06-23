@@ -1,5 +1,6 @@
 import streamlit as st
 from groq import Groq
+import requests
 
 st.set_page_config(page_title="Mon Organisateur de Voyage", page_icon="✈️", layout="centered")
 
@@ -60,17 +61,48 @@ if bouton:
         info_enfants = ""
         if ages_enfants:
             info_enfants = f" et {int(nb_enfants)} enfant(s) ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
-        question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
-        st.session_state.historique = [{"role": "user", "content": question}]
+
         with st.spinner("Je prepare ton voyage... 🌍"):
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=st.session_state.historique
-            )
-        reponse = response.choices[0].message.content
-        st.session_state.historique.append({"role": "assistant", "content": reponse})
+            question = f"Organise moi un voyage de {jours} jours a {destination} pour {int(nb_adultes)} adulte(s){info_enfants} avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
+            st.session_state.historique = [{"role": "user", "content": question}]
+            response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=st.session_state.historique)
+            reponse = response.choices[0].message.content
+            st.session_state.historique.append({"role": "assistant", "content": reponse})
+
         st.success("Voici ton itineraire ! 🎉")
         st.write(reponse)
+
+        st.markdown("---")
+        tab1, tab2, tab3, tab4 = st.tabs(["🌤️ Météo", "🗺️ Carte", "🧳 Bagages", "🗣️ Phrases utiles"])
+
+        with tab1:
+            try:
+                geo = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={destination}&count=1&language=fr").json()
+                lat = geo["results"][0]["latitude"]
+                lon = geo["results"][0]["longitude"]
+                meteo = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&temperature_unit=celsius").json()
+                temp = meteo["current_weather"]["temperature"]
+                vent = meteo["current_weather"]["windspeed"]
+                st.markdown(f"<p style='font-size:24px'>🌡️ Température actuelle à {destination} : <b>{temp}°C</b></p>", unsafe_allow_html=True)
+                st.markdown(f"<p>💨 Vent : {vent} km/h</p>", unsafe_allow_html=True)
+            except:
+                st.warning("Météo indisponible pour cette destination.")
+
+        with tab2:
+            st.markdown(f"<iframe src='https://maps.google.com/maps?q={destination}&output=embed' width='100%' height='400' style='border-radius:15px;border:none;'></iframe>", unsafe_allow_html=True)
+
+        with tab3:
+            with st.spinner("Je prépare ta liste de bagages... 🧳"):
+                q_bagages = f"Fais moi une liste de choses a emporter pour un voyage de {jours} jours a {destination} avec un budget {budget}{info_enfants}. Sois pratique et adapte a la destination. Reponds en francais."
+                r_bagages = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_bagages}])
+                st.write(r_bagages.choices[0].message.content)
+
+        with tab4:
+            with st.spinner("Je cherche les phrases utiles... 🗣️"):
+                q_phrases = f"Donne moi 15 phrases utiles pour un voyage a {destination}, avec la traduction en francais et la prononciation. Reponds en francais."
+                r_phrases = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "user", "content": q_phrases}])
+                st.write(r_phrases.choices[0].message.content)
+
     else:
         st.warning("Entre une destination d'abord ! 📍")
 
@@ -85,10 +117,7 @@ if st.session_state.get("historique"):
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         st.session_state.historique.append({"role": "user", "content": question_suivi})
         with st.spinner("Je reflechis a ta question... 💭"):
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=st.session_state.historique
-            )
+            response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=st.session_state.historique)
         reponse = response.choices[0].message.content
         st.session_state.historique.append({"role": "assistant", "content": reponse})
         st.write(reponse)
