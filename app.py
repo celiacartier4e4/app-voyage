@@ -3,7 +3,7 @@ from groq import Groq
 
 st.set_page_config(page_title="Mon Organisateur de Voyage", page_icon="✈️", layout="centered")
 
-st.markdown("<style>.stApp {background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600'); background-size: cover; background-position: center;} h1, h2, h3 {color: white !important;} .stButton>button {background-color: #ff6b35; color: white; border-radius: 20px; font-size: 18px; font-weight: bold; border: none;} .stTextInput>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .stSelectbox>div>div {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .stNumberInput>div>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .boite {background: rgba(255, 120, 30, 0.45); border-radius: 20px; padding: 30px; border: 2px solid rgba(255,160,80,0.6); margin-bottom: 20px;} * {color: black !important;} h1, h2, h3 {color: white !important;} .stApp > header {color: white !important;}</style>", unsafe_allow_html=True)
+st.markdown("<style>.stApp {background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600'); background-size: cover; background-position: center;} h1, h2, h3 {color: white !important;} .stButton>button {background-color: #ff6b35; color: white; border-radius: 20px; font-size: 18px; font-weight: bold; border: none;} .stTextInput>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .stSelectbox>div>div {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .stNumberInput>div>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9); color: black !important;} .boite {background: rgba(255, 120, 30, 0.45); border-radius: 20px; padding: 30px; border: 2px solid rgba(255,160,80,0.6); margin-bottom: 20px;} * {color: black !important;} h1, h2, h3 {color: white !important;}</style>", unsafe_allow_html=True)
 
 st.markdown("<h1 style='color:white!important'>✈️ Mon Organisateur de Voyage</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:white!important'>🌍 Dis moi où tu veux aller, et je t'organise ton voyage !</h3>", unsafe_allow_html=True)
@@ -11,12 +11,26 @@ st.markdown("---")
 
 if "historique" not in st.session_state:
     st.session_state.historique = []
+if "destination_choisie" not in st.session_state:
+    st.session_state.destination_choisie = ""
 
 st.markdown("<div class='boite'>", unsafe_allow_html=True)
 
+st.markdown("<p style='color:black!important;font-weight:bold'>🔥 Destinations populaires :</p>", unsafe_allow_html=True)
+col_a, col_b, col_c = st.columns(3)
+with col_a:
+    if st.button("🍁 Montréal"):
+        st.session_state.destination_choisie = "Montréal"
+with col_b:
+    if st.button("🗼 Tokyo"):
+        st.session_state.destination_choisie = "Tokyo"
+with col_c:
+    if st.button("🌴 Bali"):
+        st.session_state.destination_choisie = "Bali"
+
 col1, col2 = st.columns(2)
 with col1:
-    destination = st.text_input("📍 Ta destination")
+    destination = st.text_input("📍 Ta destination", value=st.session_state.destination_choisie)
 with col2:
     jours = st.number_input("📅 Nombre de jours", min_value=1, value=5)
 
