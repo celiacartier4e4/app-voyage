@@ -1,48 +1,11 @@
 import streamlit as st
 from groq import Groq
 
-st.set_page_config(
-    page_title="Mon Organisateur de Voyage",
-    page_icon="✈️",
-    layout="centered"
-)
+st.set_page_config(page_title="Mon Organisateur de Voyage", page_icon="✈️", layout="centered")
 
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url("https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600");
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-    }
-    h1, h2, h3, p, label {
-        color: white !important;
-    }
-    .stButton>button {
-        background-color: #ff6b35;
-        color: white;
-        border-radius: 20px;
-        font-size: 18px;
-        font-weight: bold;
-        border: none;
-    }
-    .stTextInput>div>input {
-        border-radius: 15px;
-        background-color: rgba(255,255,255,0.9);
-    }
-    .stSelectbox>div>div {
-        border-radius: 15px;
-        background-color: rgba(255,255,255,0.9);
-    }
-    .stNumberInput>div>div>input {
-        border-radius: 15px;
-        background-color: rgba(255,255,255,0.9);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)st.markdown("# ✈️ Mon Organisateur de Voyage")
+st.markdown("<style>.stApp {background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1600'); background-size: cover; background-position: center;} h1, h2, h3, label {color: white !important;} .stButton>button {background-color: #ff6b35; color: white; border-radius: 20px; font-size: 18px; font-weight: bold; border: none;} .stTextInput>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9);} .stSelectbox>div>div {border-radius: 15px; background-color: rgba(255,255,255,0.9);} .stNumberInput>div>div>input {border-radius: 15px; background-color: rgba(255,255,255,0.9);}</style>", unsafe_allow_html=True)
+
+st.markdown("# ✈️ Mon Organisateur de Voyage")
 st.markdown("### 🌍 Dis moi où tu veux aller, et je t'organise ton voyage !")
 st.markdown("---")
 
@@ -61,16 +24,16 @@ if "historique" not in st.session_state:
 
 if st.button("✈️ Organise mon voyage !"):
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-    question = f"Organise moi un voyage de {jours} jours à {destination} avec un budget {budget}. Fais un itinéraire jour par jour en français."
+    question = f"Organise moi un voyage de {jours} jours a {destination} avec un budget {budget}. Fais un itineraire jour par jour en francais."
     st.session_state.historique = [{"role": "user", "content": question}]
-    with st.spinner("Je prépare ton voyage... 🌍"):
+    with st.spinner("Je prepare ton voyage... 🌍"):
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=st.session_state.historique
         )
     reponse = response.choices[0].message.content
     st.session_state.historique.append({"role": "assistant", "content": reponse})
-    st.success("Voici ton itinéraire ! 🎉")
+    st.success("Voici ton itineraire ! 🎉")
     st.write(reponse)
 
 if st.session_state.get("historique"):
@@ -80,7 +43,7 @@ if st.session_state.get("historique"):
     if st.button("📨 Poser ma question"):
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         st.session_state.historique.append({"role": "user", "content": question_suivi})
-        with st.spinner("Je réfléchis à ta question... 💭"):
+        with st.spinner("Je reflechis a ta question... 💭"):
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=st.session_state.historique
