@@ -13,13 +13,27 @@ if "historique" not in st.session_state:
     st.session_state.historique = []
 
 st.markdown("<div class='boite'>", unsafe_allow_html=True)
-col1, col2, col3 = st.columns(3)
+
+col1, col2 = st.columns(2)
 with col1:
     destination = st.text_input("📍 Ta destination")
 with col2:
     jours = st.number_input("📅 Nombre de jours", min_value=1, value=5)
+
+col3, col4 = st.columns(2)
 with col3:
     budget = st.selectbox("💰 Ton budget", ["Petit budget", "Moyen", "Confortable"])
+with col4:
+    nb_personnes = st.number_input("👥 Nombre de personnes", min_value=1, value=1)
+
+type_voyageurs = st.selectbox("🧑 Type de voyageurs", ["Adultes uniquement", "Adultes et enfants", "Enfants uniquement"])
+
+ages_enfants = []
+if type_voyageurs in ["Adultes et enfants", "Enfants uniquement"]:
+    nb_enfants = st.number_input("👶 Nombre d'enfants", min_value=1, value=1)
+    for i in range(int(nb_enfants)):
+        age = st.number_input(f"🎂 Age de l'enfant {i+1}", min_value=1, max_value=16, value=5)
+        ages_enfants.append(age)
 
 bouton = st.button("✈️ Organise mon voyage !")
 st.markdown("</div>", unsafe_allow_html=True)
@@ -27,7 +41,12 @@ st.markdown("</div>", unsafe_allow_html=True)
 if bouton:
     if destination:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-        question = f"Organise moi un voyage de {jours} jours a {destination} avec un budget {budget}. Fais un itineraire jour par jour en francais."
+
+        info_enfants = ""
+        if ages_enfants:
+            info_enfants = f" avec des enfants ages de {', '.join([str(a) + ' ans' for a in ages_enfants])}"
+
+        question = f"Organise moi un voyage de {jours} jours a {destination} pour {nb_personnes} personnes ({type_voyageurs}{info_enfants}) avec un budget {budget}. Fais un itineraire jour par jour en francais adapte au groupe."
         st.session_state.historique = [{"role": "user", "content": question}]
         with st.spinner("Je prepare ton voyage... 🌍"):
             response = client.chat.completions.create(
