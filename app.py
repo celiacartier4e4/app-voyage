@@ -1,5 +1,8 @@
 import streamlit as st
 import requests
+import json
+import re
+import streamlit.components.v1 as components
 from groq import Groq
 from groq import APIError
 
@@ -126,6 +129,261 @@ def demander_a_groq(client, messages):
         st.error("Une erreur inattendue est survenue pendant la communication avec Groq.")
         st.caption(f"Détail technique : {exc}")
         return None
+
+
+
+# ---------------------------------------------------------
+# CIRCUIT TOURISTIQUE SUR CARTE
+# ---------------------------------------------------------
+def extraire_etapes_circuit(client, destination, jours, type_voyage, nb_villes):
+    """Demande à l'IA une liste structurée de lieux à visiter, dans l'ordre."""
+    if type_voyage == "Road trip (plusieurs villes)":
+        consigne_type = (
+            f"Le circuit doit traverser exactement {int(nb_villes)} villes "
+            f"ou étapes urbaines différentes dans la région/pays {destination}. "
+            "Répartis les lieux entre ces villes dans un ordre géographique logique."
+        )
+        nombre_lieux = max(8, min(18, int(jours) * 2))
+    else:
+        consigne_type = (
+            f"Tous les lieux doivent se trouver dans la ville de {destination} "
+            "ou à proximité immédiate."
+        )
+        nombre_lieux = max(5, min(12, int(jours) + 3))
+
+    prompt = f"""
+Tu es un organisateur de circuits touristiques. Prépare une liste de {nombre_lieux}
+lieux réels et connus à visiter pendant {int(jours)} jours à {destination}.
+{consigne_type}
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans Markdown, sous cette forme :
+{{
+  "etapes": [
+    {{
+      "jour": 1,
+      "ville": "Nom de la ville",
+      "lieu": "Nom officiel ou courant du lieu",
+      "description": "Description courte du lieu"
+    }}
+  ]
+}}
+
+Règles :
+- Respecte l'ordre conseillé de visite.
+- Répartis les étapes sur les {int(jours)} jours.
+- Utilise des lieux touristiques réels, précis et géocodables.
+- Pour un road trip, garde une progression géographique cohérente entre les villes.
+- N'ajoute aucune coordonnée GPS.
+- Réponds uniquement en français dans les descriptions.
+"""
+    contenu = demander_a_groq(
+        client,
+        [{"role": "user", "content": prompt}]
+    )
+    if not contenu:
+        return []
+
+    try:
+        # Tolère les éventuelles balises Markdown renvoyées par le modèle.
+        contenu = contenu.strip()
+        if contenu.startswith("```"):
+            contenu = re.sub(r"^```(?:json)?\s*", "", contenu)
+            contenu = re.sub(r"\s*```$", "", contenu)
+        donnees = json.loads(contenu)
+        etapes = donnees.get("etapes", [])
+        return [
+            e for e in etapes
+            if isinstance(e, dict) and e.get("lieu") and e.get("ville")
+        ]
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        st.warning("Je n'ai pas réussi à structurer les lieux du circuit. La carte ne peut pas être créée.")
+        return []
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def geocoder_lieu(nom_lieu, ville, destination):
+    """Trouve les coordonnées d'un lieu avec le service public OpenStreetMap."""
+    requete = f"{nom_lieu}, {ville}, {destination}"
+    try:
+        resultat = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": requete,
+                "format": "jsonv2",
+                "limit": 1
+            },
+            headers={"User-Agent": "MonOrganisateurDeVoyage/1.0"},
+            timeout=15
+        )
+        resultat.raise_for_status()
+        elements = resultat.json()
+        if not elements:
+            # Deuxième essai moins précis si la recherche complète échoue.
+            resultat = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": f"{nom_lieu}, {ville}",
+                    "format": "jsonv2",
+                    "limit": 1
+                },
+                headers={"User-Agent": "MonOrganisateurDeVoyage/1.0"},
+                timeout=15
+            )
+            resultat.raise_for_status()
+            elements = resultat.json()
+
+        if elements:
+            return {
+                "lat": float(elements[0]["lat"]),
+                "lon": float(elements[0]["lon"]),
+                "adresse": elements[0].get("display_name", requete)
+            }
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return None
+    return None
+
+
+def construire_circuit_carte(etapes, destination):
+    """Géocode les étapes puis affiche une carte interactive avec ordre du circuit."""
+    etapes_geocodees = []
+
+    progression = st.progress(0, text="Localisation des lieux à visiter...")
+    total = len(etapes)
+
+    for index, etape in enumerate(etapes):
+        ville = str(etape.get("ville", destination))
+        lieu = str(etape.get("lieu", "")).strip()
+        coordonnees = geocoder_lieu(lieu, ville, destination)
+
+        if coordonnees:
+            etapes_geocodees.append({
+                "numero": len(etapes_geocodees) + 1,
+                "jour": etape.get("jour", "?"),
+                "ville": ville,
+                "lieu": lieu,
+                "description": str(etape.get("description", "")),
+                "lat": coordonnees["lat"],
+                "lon": coordonnees["lon"]
+            })
+
+        progression.progress(
+            (index + 1) / total,
+            text=f"Recherche des lieux : {index + 1}/{total}"
+        )
+
+    progression.empty()
+
+    if not etapes_geocodees:
+        st.warning(
+            "Je n'ai pas réussi à localiser les lieux proposés. "
+            "Essaie avec une destination plus précise."
+        )
+        return
+
+    st.markdown("## 🗺️ Ton circuit touristique")
+    st.caption(
+        "Les numéros indiquent l'ordre conseillé des visites. "
+        "Les positions sont issues d'OpenStreetMap."
+    )
+
+    # Données JSON échappées pour insertion sûre dans le composant HTML.
+    points_json = json.dumps(etapes_geocodees, ensure_ascii=False)
+    points_json = points_json.replace("</", "<\\/")
+
+    carte_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+      <style>
+        html, body {{ margin:0; padding:0; }}
+        #carte {{ height: 540px; width:100%; border-radius:16px; }}
+        .numero {{
+          background:#ff6b35; color:white; border:2px solid white;
+          border-radius:50%; width:30px; height:30px;
+          line-height:26px; text-align:center; font-weight:bold;
+          box-shadow:0 1px 5px #555;
+        }}
+        .leaflet-popup-content {{ font-family:Arial,sans-serif; }}
+      </style>
+    </head>
+    <body>
+      <div id="carte"></div>
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <script>
+        const points = {points_json};
+        const carte = L.map('carte');
+        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap'
+        }}).addTo(carte);
+
+        const coordonnees = [];
+        points.forEach((p) => {{
+          const position = [p.lat, p.lon];
+          coordonnees.push(position);
+
+          const icone = L.divIcon({{
+            className: '',
+            html: '<div class="numero">' + p.numero + '</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          }});
+
+          const popup =
+            '<b>Étape ' + p.numero + ' — Jour ' + p.jour + '</b><br>' +
+            '<b>' + p.lieu + '</b><br>' +
+            p.ville + '<br>' +
+            p.description;
+
+          L.marker(position, {{icon: icone}}).addTo(carte).bindPopup(popup);
+        }});
+
+        if (coordonnees.length > 1) {{
+          L.polyline(coordonnees, {{
+            color:'#ff6b35', weight:4, opacity:0.85,
+            dashArray:'8, 8'
+          }}).addTo(carte);
+        }}
+
+        if (coordonnees.length > 0) {{
+          carte.fitBounds(coordonnees, {{padding:[30,30] }});
+        }} else {{
+          carte.setView([20, 0], 2);
+        }}
+      </script>
+    </body>
+    </html>
+    """
+    components.html(carte_html, height=560, scrolling=False)
+
+    st.markdown("### 📍 Les étapes dans l'ordre")
+    for point in etapes_geocodees:
+        st.markdown(
+            f"**{point['numero']}. {point['lieu']}** — "
+            f"Jour {point['jour']} · {point['ville']}"
+        )
+        if point["description"]:
+            st.caption(point["description"])
+
+    # Lien Google Maps pour ouvrir le parcours complet.
+    if len(etapes_geocodees) >= 2:
+        origine = f"{etapes_geocodees[0]['lat']},{etapes_geocodees[0]['lon']}"
+        destination_finale = (
+            f"{etapes_geocodees[-1]['lat']},{etapes_geocodees[-1]['lon']}"
+        )
+        intermediaires = "|".join(
+            f"{p['lat']},{p['lon']}" for p in etapes_geocodees[1:-1]
+        )
+        url = (
+            "https://www.google.com/maps/dir/?api=1"
+            f"&origin={origine}&destination={destination_finale}"
+            f"&waypoints={intermediaires}&travelmode=driving"
+        )
+        st.link_button("🚗 Ouvrir ce circuit dans Google Maps", url)
 
 
 # ---------------------------------------------------------
@@ -314,6 +572,16 @@ def generer_voyage(
     st.write(reponse)
     st.markdown("---")
 
+    # Génération de la carte et du circuit ordonné
+    with st.spinner("Je prépare le circuit et localise les lieux à visiter... 🗺️"):
+        etapes_circuit = extraire_etapes_circuit(
+            client, destination, jours, type_voyage, nb_villes
+        )
+        if etapes_circuit:
+            construire_circuit_carte(etapes_circuit, destination)
+
+    st.markdown("---")
+
     # Avis sur la destination
     with st.spinner("Analyse de la destination... 🌟"):
         q_note = (
@@ -358,8 +626,8 @@ def generer_voyage(
         st.info("📅 " + r_periode)
 
     # Onglets
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["🌤️ Météo", "🗺️ Carte", "🧳 Bagages", "🗣️ Phrases", "⚠️ Sécurité", "🍽️ Cuisine"]
+    tab1, tab3, tab4, tab5, tab6 = st.tabs(
+        ["🌤️ Météo", "🧳 Bagages", "🗣️ Phrases", "⚠️ Sécurité", "🍽️ Cuisine"]
     )
 
     with tab1:
@@ -408,21 +676,6 @@ def generer_voyage(
             st.warning("Météo indisponible pour le moment. Réessaie plus tard.")
         except (KeyError, TypeError, ValueError):
             st.warning("Les données météo reçues sont incomplètes.")
-
-    with tab2:
-        destination_url = requests.utils.quote(destination)
-        st.markdown(
-            f"""
-            <iframe
-                src="https://maps.google.com/maps?q={destination_url}&output=embed"
-                width="100%"
-                height="400"
-                style="border-radius:15px;border:none;"
-                loading="lazy">
-            </iframe>
-            """,
-            unsafe_allow_html=True
-        )
 
     with tab3:
         with st.spinner("Je prépare ta liste de bagages... 🧳"):
